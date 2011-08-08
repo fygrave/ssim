@@ -1,0 +1,13 @@
+
+OSSIM is open source log collection and security event correlation system. OSSIM downloads are available at http://alienvault.com/download-ossim
+
+This is an erlang/OTP based implementation of OSSIM event collection and correlation server. It is indended to work directly with ossim-agent and 
+does not require any additional OSSIM components (database, framework, UI are not needed).
+
+The riak is being used as primarily storage system and RabbitMQ is used as messaging platform between system components. Simple UI will be released
+later at one point.
+
+for any questions fygrave at o0o dot nu
+
+
+
