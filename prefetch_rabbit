@@ -1,0 +1,9 @@
+#!/bin/sh
+
+
+echo "Fetching rabbit"
+
+curl http://www.rabbitmq.com/releases/rabbitmq-erlang-client/v2.5.1/amqp_client-2.5.1.ez -o deps/amqp_client-2.5.1.ez
+curl http://www.rabbitmq.com/releases/rabbitmq-erlang-client/v2.5.1/rabbit_common-2.5.1.ez -o deps/rabbit_common-2.5.1.ez
+
+cd deps; unzip amqp_client-2.5.1.ez; unzip rabbit_common-2.5.1.ez; mv amqp_client-2.5.1 amqp_client; mv rabbit_common-2.5.1 rabbit_common; cd ..
