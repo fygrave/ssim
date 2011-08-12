@@ -27,7 +27,7 @@ Basic architecture:
 It is possible to cluster instances of ssim_agent_servers and ssim_correlators
 
 To build and start server:
-
+   mkdir deps ebin
    ./rebar check-deps
    ./prefetch_rabbit
    ./rebar get-deps
@@ -36,6 +36,7 @@ To build and start server:
    ../rebar create-node nodeid=ssim
    cd ..
    cp reltool.config rel/
+   cp priv/app.config.sample rel/files/app.config
    rebar generate
    cd rel/ssim/etc
    <edit app.config to point to your riaksearch cluster and rabbitmq server>
