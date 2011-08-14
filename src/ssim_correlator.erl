@@ -25,7 +25,8 @@
 -define (MESSAGE_KEY, <<"message">>).
 
 -record(state, {riaksock,
-	       msgcount
+	       msgcount,
+		bucket
 }).
 
 -include("deps/amqp_client/include/amqp_client.hrl").
@@ -69,7 +70,7 @@ init([]) ->
     {ok, Params} = ssim_util:get_env(riakc_params),
     {ok, SPid} = riakc_pb_socket:start_link(proplists:get_value(db_hostname, Params), 
 					   proplists:get_value(db_port, Params)),
-    State = #state{riaksock = SPid, msgcount = 0},
+    State = #state{riaksock = SPid, msgcount = 0, bucket = proplists:get_value(bucket, Params)},
     Rez = ssim_mq:subscribe_queue(?MESSAGE_KEY),
     io:format("Subscribed ~p~n", [ Rez]),
     {ok, State}.
@@ -137,7 +138,7 @@ handle_info ({nodeup, _Node}, State) ->
     {noreply, State};
 % this really should be moved to ssim_mq
 handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},State) ->
-    store_message(binary_to_term(Body), State#state.riaksock),
+    store_message(binary_to_term(Body), State#state.riaksock, State#state.bucket),
     NewState = #state{ riaksock = State#state.riaksock,  msgcount = State#state.msgcount + 1},
     {noreply, NewState};
 handle_info ({nodedown, _Node}, State) ->
@@ -179,9 +180,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-store_message(Message, RiakPid) ->
-    io:format("Receiving message ~s ..",[Message]),    
-    Object = riakc_obj:new(<<"testlog">>, ssim_util:get_datekey(),iolist_to_binary(mochijson2:encode( {struct, [{text, list_to_binary(Message)}]})), <<"application/json">>),
+store_message(Message, RiakPid, Bucket) ->
+    io:format("Receiving message ~p ..",[Message]),
+    Object = riakc_obj:new(Bucket, ssim_util:get_datekey(),iolist_to_binary(mochijson2:encode(Message)), <<"application/json">>),
     riakc_pb_socket:put(RiakPid, Object),
     io:format("Message stored ~p~n", [Object]). 
 

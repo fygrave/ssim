@@ -12,7 +12,8 @@
 	 {riakc_params,
 	  [
 	   {db_hostname, "127.0.0.1"},
-	   {db_port, 8087}
+	   {db_port, 8087},
+	   {bucket, <<"logs">>}
 	  ]
 	 },
 	 {mq_connection_params,

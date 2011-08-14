@@ -12,6 +12,7 @@
 %%API
 
 -export([
+	 unix_timestamp/1,
 	 get_env/1, 
 	 hex/1,
 	 get_datekey/0,
@@ -20,6 +21,10 @@
 	 decode_compress_lstring/1
 ]).
 
+
+unix_timestamp({MegaSecs, Secs, MicroSecs}=TS) ->    
+    calendar:datetime_to_gregorian_seconds( calendar:now_to_universal_time(TS) ) -
+            calendar:datetime_to_gregorian_seconds( {{1970,1,1},{0,0,0}} ).
 
 
 get_env(Key) ->
@@ -66,5 +71,6 @@ decode_compress_lstring(Data) ->
    
 get_datekey() ->
     {{Yer,Mon,Day},{Hour,Month,Sec}} = calendar:local_time(),
-        list_to_binary(lists:concat([integer_to_list(Yer), integer_to_list(Mon), integer_to_list(Day), integer_to_list(Hour), integer_to_list(Month), integer_to_list(Sec)])).
+
+        list_to_binary(io_lib:fwrite("~4..0b-~2..0b-~2..0b-~2..0b-~2..0b-~2..0b-000", [ Yer, Mon, Day, Hour, Month, Sec])).
 

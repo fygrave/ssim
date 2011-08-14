@@ -140,12 +140,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_socket(Socket, RawData) ->
 %    io:format("Data: ~s~n", [RawData]),
-    try
+%    try
+	{ok, {PeerAddr, PeerPort}} = inet:peername(Socket),
 	{Cmd,  Msg} = parse_message(RawData),
 %	io:format("Got '~s' msg ~s~n", [ Cmd, Msg]),
 	case Cmd of
 	    "event" ->
-		store_message(Msg, event);
+		store_message(Msg, PeerAddr, event);
 	    "connect" ->
 		io:format("In connect clause~n"),
 		{Seq} = register_connect(Msg),
@@ -164,12 +165,12 @@ handle_socket(Socket, RawData) ->
 	    "plugin-process-stopped" ->
 		plugin_handle(Msg, Cmd);
 	    "snort-event" ->
-		store_message(Msg, snort)
-	end
-    catch
-	_Class:Err ->
-	    io:format("Woops.. Error ~p!~n", [Err])
-
+		store_message(Msg, PeerAddr, snort)
+%	end
+%    catch
+%	_Class:Err ->
+%	    io:format("Woops.. Error ~p!~n", [Err])
+%
     end.
 
 parse_message(Data) ->
@@ -188,15 +189,28 @@ plugin_append(Data) ->
     {Seq}.
 
 
-store_message(Msg, snort) ->
+store_message(Msg, PeerAddr, snort) ->
     {match, [Sensor, Raw]} = re:run(Msg, "sensor=\"(\\S+)\".*gzipdata=\"(\\S+)\".*",  [{capture, [1, 2], list},unicode]),
     Decoded = binary_to_list(ssim_util:decode_compress_lstring(Raw)),
     io:format("Decoded ~s ~s~n", [ Sensor, Decoded]),
-    ssim_mq:send_message(io_lib:fwrite("sensor=\"~s\" ~s",[ Sensor,  Decoded])),
-    io:format("Stored~n");
+    case ssim_parser:message_to_struct(Decoded, Sensor) of
+	{ok, Parsed} ->
+	    ssim_mq:send_message(Parsed),
+	    io:format("Stored~n");
+	_Else ->
+	    io:format("Parsing error of ~s~n", [ Decoded]),
+	    ssim_mq:send_message({struct, [{originalMessage, Decoded}, {sensor, Sensor}, {time, ssim_parser:get_date_now()}]})
+    end;
 
-store_message(Msg, event) ->
-    ssim_mq:send_message(Msg).
+store_message(Msg, PeerAddr, event) ->
+    case ssim_parser:message_to_struct(Msg, PeerAddr) of
+        {ok, Parsed} ->
+            ssim_mq:send_message(Parsed),
+            io:format("Stored~n");
+        _Else ->
+            io:format("Parsing error of ~s~n", [ Msg]),
+            ssim_mq:send_message({struct, [{originalMessage, Msg}, {sensor, PeerAddr}, {time, ssim_parser:get_date_now()}]})
+    end.
 
 plugin_handle(Msg, Cmd) ->
     ssim_mq:send_agent(io_lib:fwrite("~s ~s", [ Cmd, Msg ])).
@@ -205,3 +219,5 @@ plugin_handle(Msg, Cmd) ->
 register_time(Msg)->
     ssim_mq:send_agent(Msg),
     io:format("Time sync ~s~n", [Msg]).
+
+
