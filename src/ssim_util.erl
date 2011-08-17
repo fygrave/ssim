@@ -18,7 +18,8 @@
 	 get_datekey/0,
 	 to_hex/1,
 	 decode_compress_string/1,
-	 decode_compress_lstring/1
+	 decode_compress_lstring/1,
+	 always_binary/1
 ]).
 
 
@@ -74,3 +75,11 @@ get_datekey() ->
 
         list_to_binary(io_lib:fwrite("~4..0b-~2..0b-~2..0b-~2..0b-~2..0b-~2..0b-000", [ Yer, Mon, Day, Hour, Month, Sec])).
 
+
+always_binary(Arg) ->
+    case is_list(Arg) of
+	true ->
+	    list_to_binary(Arg);
+	false ->
+	    Arg
+    end.

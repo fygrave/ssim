@@ -140,38 +140,49 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_socket(Socket, RawData) ->
 %    io:format("Data: ~s~n", [RawData]),
-%    try
-	{ok, {PeerAddr, PeerPort}} = inet:peername(Socket),
+  
+    PeerAddr = peername_str(Socket),
+
+    try
 	{Cmd,  Msg} = parse_message(RawData),
 %	io:format("Got '~s' msg ~s~n", [ Cmd, Msg]),
 	case Cmd of
 	    "event" ->
 		store_message(Msg, PeerAddr, event);
 	    "connect" ->
-		io:format("In connect clause~n"),
-		{Seq} = register_connect(Msg),
+		{Seq,M} = register_connect(Msg),
+		store_agent(PeerAddr, "connect", M),
 		gen_tcp:send(Socket, io_lib:fwrite("ok id=\"~s\"~n", [ Seq ]));
 	    "session-append-plugin" ->
-		{Seq} = plugin_append(Msg),
+		{Seq, M} = plugin_append(Msg),
+		store_agent(PeerAddr, "session-append-plugin", M),
 		gen_tcp:send(Socket, io_lib:fwrite("ok id=\"~s\"~n", [ Seq ]));
 	    "agent-date" ->
+		store_agent(PeerAddr, "agent-date", Msg),
 		register_time(Msg);
 	    "plugin-process-started" ->
-		plugin_handle(Msg, Cmd);
+		store_agent(PeerAddr, Cmd, Msg);
 	    "plugin-process-unknown" ->
-		plugin_handle(Msg, Cmd);
+		store_agent(PeerAddr, Cmd, Msg);
 	    "plugin-enabled" ->
-		plugin_handle(Msg, Cmd);
+		store_agent(PeerAddr, Cmd, Msg);
 	    "plugin-process-stopped" ->
-		plugin_handle(Msg, Cmd);
+		store_agent(PeerAddr, Cmd, Msg);
 	    "snort-event" ->
-		store_message(Msg, PeerAddr, snort)
-%	end
-%    catch
-%	_Class:Err ->
-%	    io:format("Woops.. Error ~p!~n", [Err])
-%
+		store_message(Msg, PeerAddr, snort);
+	    _Else ->
+		io:format("Unknown cmd ~s~n", [ _Else ])
+	end
+    catch
+	_Class:Err ->
+	    store_agent(PeerAddr, "Error", Err)
+
     end.
+
+peername_str(Socket) ->
+    {ok, {PeerAddr, PeerPort}} = inet:peername(Socket),
+    {A, B, C, D} = PeerAddr,
+    list_to_binary(io_lib:fwrite("~b.~b.~b.~b", [ A, B, C, D])).
 
 parse_message(Data) ->
     {match, [Cmd, Msg]} = re:run(Data, "(\\S+)\\s+(.*)", [{capture, [1, 2], list},unicode]),
@@ -180,13 +191,11 @@ parse_message(Data) ->
 register_connect(Data) ->
     {match, [Seq, Msg]} = re:run(Data, "id=\"?(\\d+)\"\\s+(.*)",  [{capture, [1, 2], list},unicode]),
     io:format("Connected ~s~n", [Msg]),
-    ssim_mq:send_agent(io_lib:fwrite("connect ~s", [ Msg ])),
-    {Seq}.
+    {Seq, Msg}.
 
 plugin_append(Data) ->
     {match, [Seq, Msg]} = re:run(Data, "id=\"?(\\d+)\"\\s+(.*)",  [{capture, [1, 2], list},unicode]),
-    ssim_mq:send_agent(io_lib:fwrite("plugin-append ~s", [ Msg ])),
-    {Seq}.
+    {Seq, Msg}.
 
 
 store_message(Msg, PeerAddr, snort) ->
@@ -195,8 +204,7 @@ store_message(Msg, PeerAddr, snort) ->
     io:format("Decoded ~s ~s~n", [ Sensor, Decoded]),
     case ssim_parser:message_to_struct(Decoded, Sensor) of
 	{ok, Parsed} ->
-	    ssim_mq:send_message(Parsed),
-	    io:format("Stored~n");
+	    ssim_mq:send_message(Parsed);
 	_Else ->
 	    io:format("Parsing error of ~s~n", [ Decoded]),
 	    ssim_mq:send_message({struct, [{originalMessage, Decoded}, {sensor, Sensor}, {time, ssim_parser:get_date_now()}]})
@@ -205,19 +213,17 @@ store_message(Msg, PeerAddr, snort) ->
 store_message(Msg, PeerAddr, event) ->
     case ssim_parser:message_to_struct(Msg, PeerAddr) of
         {ok, Parsed} ->
-            ssim_mq:send_message(Parsed),
-            io:format("Stored~n");
+            ssim_mq:send_message(Parsed);
         _Else ->
             io:format("Parsing error of ~s~n", [ Msg]),
             ssim_mq:send_message({struct, [{originalMessage, Msg}, {sensor, PeerAddr}, {time, ssim_parser:get_date_now()}]})
     end.
 
-plugin_handle(Msg, Cmd) ->
-    ssim_mq:send_agent(io_lib:fwrite("~s ~s", [ Cmd, Msg ])).
+store_agent(Peer, Msg, Cmd) ->
+    ssim_mq:send_agent({struct, [{source, Peer},{cmd, Cmd},{msg, Msg}]}).
 
 
 register_time(Msg)->
-    ssim_mq:send_agent(Msg),
     io:format("Time sync ~s~n", [Msg]).
 
 

@@ -12,8 +12,6 @@
 
 %% API
 -export([start_link/0,
-	queue_message_reader/1,
-	 queue_agent_reader/1,
 	 check_status/0,
 	 statistics/0
 
@@ -27,7 +25,7 @@
 -define(AGENT_KEY, <<"agent">>).
 
 -record(state, {riaksock,
-	       readers
+	       bucket
 }).
 
 -include("deps/amqp_client/include/amqp_client.hrl").
@@ -71,9 +69,8 @@ init([]) ->
     {ok, Params} = ssim_util:get_env(riakc_params),
     {ok, SPid} = riakc_pb_socket:start_link(proplists:get_value(db_hostname, Params), 
 					   proplists:get_value(db_port, Params)),
-    State = #state{riaksock = SPid},
+    State = #state{riaksock = SPid, bucket = proplists:get_value(status_bucket, Params)},
     Rez = ssim_mq:subscribe_queue(?AGENT_KEY),
-    io:format("Subscribed ~p~n", [ Rez]),
     {ok, State}.
 
 %%--------------------------------------------------------------------
@@ -138,7 +135,7 @@ handle_info ({nodeup, _Node}, State) ->
     io:format("info: Node up~n"),
     {noreply, State};
 handle_info({#'basic.deliver'{}, #amqp_msg{payload = Body}},State) ->
-    io:format("info: received agent update: ~s~n", [binary_to_term(Body)]),
+    store_message(binary_to_term(Body), State#state.riaksock, State#state.bucket),
     {noreply, State};
 handle_info ({nodedown, _Node}, State) ->
     io:format("info: Node down~n"),
@@ -179,33 +176,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-queue_message_reader(RiakSock) ->
-    io:format("Receiving messages~n"),
-    case ssim_mq:receive_message() of
-	{ok, Message} ->
-	    io:format("MSG Received ~s~n",[Message]);
-	{error, Reason} ->
-	    %timer:sleep(1000),
-	    io:format("Not received ~s~n", Reason);
-	_Else ->
-	    io:format("AG Else ~p~n", _Else)
-    end,
-    
-%Object = riakc_obj:new(<<"testlog">>, get_datekey(), mochijson2:encode({struct, [{text, list_to_binary(lists:concat(["Agen\t message ",payload_decode(Body)]))}]})),
-%riakc_pb_socket:put(Pid, Object),
-    queue_message_reader(RiakSock). % loop
-    
-queue_agent_reader(RiakSock) ->
-    io:format("Receiving agent messages~n"),
-    case ssim_mq:receive_agent() of
-	{ok, Message} ->
-	    io:format("Agent Received ~s~n",[Message]);
-	{error, Reason} ->
-	    %timer:sleep(1000),
-	    io:format("AG Not received ~s~n", Reason);
-	_Else ->
-	    io:format("AG Else ~p~n", _Else)
-    end,
 
-    queue_agent_reader(RiakSock).
-
+store_message(Message, RiakPid, Bucket) ->
+    io:format("Agent message ~p~n", [ Message ]),
+    {struct, S} = Message,
+    Key = ssim_util:always_binary(proplists:get_value(source, S)),
+	    
+    Object = riakc_obj:new(Bucket, Key, iolist_to_binary(mochijson2:encode(Message)), <<"application/json">>),
+    riakc_pb_socket:put(RiakPid, Object).

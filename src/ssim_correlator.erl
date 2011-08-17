@@ -70,7 +70,10 @@ init([]) ->
     {ok, Params} = ssim_util:get_env(riakc_params),
     {ok, SPid} = riakc_pb_socket:start_link(proplists:get_value(db_hostname, Params), 
 					   proplists:get_value(db_port, Params)),
-    State = #state{riaksock = SPid, msgcount = 0, bucket = proplists:get_value(bucket, Params)},
+    Bucket = proplists:get_value(data_bucket, Params),
+    io:format("Data bucket ~s ~n", [ Bucket ]),
+    State = #state{riaksock = SPid, msgcount = 0, bucket = proplists:get_value(data_bucket, Params)},
+    io:format("Initial state ~p~n", [ State]),
     Rez = ssim_mq:subscribe_queue(?MESSAGE_KEY),
     io:format("Subscribed ~p~n", [ Rez]),
     {ok, State}.
@@ -115,7 +118,6 @@ handle_cast({up, _Node, _Services}, State) ->
     io:format("Cast node up~n"),
     {noreply, State};
 handle_cast({#'basic.consume_ok'{}, Tag}, State) ->
-    io:format("Got basic consume~n"),
     {noreply, State};
 handle_cast({down, _Node}, State)->
     io:format("Cast node down~n"),

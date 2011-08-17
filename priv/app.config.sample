@@ -13,7 +13,8 @@
 	  [
 	   {db_hostname, "127.0.0.1"},
 	   {db_port, 8087},
-	   {bucket, <<"logs">>}
+	   {data_bucket, <<"logs">>},
+	   {status_bucket, <<"statuse">>}
 	  ]
 	 },
 	 {mq_connection_params,
