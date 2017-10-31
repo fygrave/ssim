@@ -3,11 +3,11 @@ Scalable Correlation Server for OSSIM (Open Source Security Information Manageme
 
 
 This is an erlang/OTP based implementation of OSSIM event collection and correlation server.
-It is indended to work directly with ossim-agent and does not require any additional OSSIM
+It is intended to work directly with ossim-agent and does not require any additional OSSIM
  components (database, framework, UI are not needed).
 
-The riak is being used as primarily storage system and RabbitMQ is used as messaging platform
-between system components. Both components should allow endless horisontal scalability.
+The riak is being used as the primarily storage system and RabbitMQ is used as a messaging platform
+between system components. Both components should allow endless horizontal scalability.
 
 You will need:
     ossim-agent (http://alienvalut.com/download-ossim)
